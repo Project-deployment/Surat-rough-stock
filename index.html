@@ -658,8 +658,8 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--accent-navy);"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Mode:
             <select id="select-user-mode" style="border: 1px solid var(--card-border); background: #ffffff; color: var(--text-primary); padding: 4px 8px; border-radius: 6px; font-family: inherit; font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer;">
-                <option value="PR">PR (Kapan Entry)</option>
-                <option value="SJ">SJ (Jama Delete)</option>
+                <option value="user1">PR (Kapan Entry)</option>
+                <option value="user2">SJ (Jama Delete)</option>
             </select>
         </div>
         
@@ -754,6 +754,29 @@
 
             <!-- VIEW 3: KAPAN MASTER -->
             <div id="view-kapan-master" class="view-pane" style="display: none;">
+                
+                <!-- Full-Width User Name Settings Card -->
+                <div class="stock-controls" style="padding: 10px 16px; width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 12px;">
+                    <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-navy); display: flex; align-items: center; gap: 6px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--accent-navy);"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        User Name Settings
+                    </div>
+                    <div style="display: flex; gap: 20px; width: 100%; flex-wrap: wrap; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">User 1 (Kapan Entry):</label>
+                            <input type="text" id="input-username-1" class="form-control" style="width: 150px; padding: 4px 8px; font-size: 0.85rem; font-weight: 700;" value="PR">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">User 2 (Jama Delete):</label>
+                            <input type="text" id="input-username-2" class="form-control" style="width: 150px; padding: 4px 8px; font-size: 0.85rem; font-weight: 700;" value="SJ">
+                        </div>
+                        <button class="btn-add" onclick="saveUserNames()" style="padding: 6px 14px; font-size: 0.85rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Names
+                        </button>
+                    </div>
+                </div>
+
                 <div class="master-grid">
                     
                     <!-- Left: Group Master -->
@@ -1007,6 +1030,12 @@
             dates: {}
         };
 
+        // User Settings State
+        let userNames = {
+            user1: "PR",
+            user2: "SJ"
+        };
+
         // Date Picker setup
         const datePicker = document.getElementById('header-date-picker');
 
@@ -1104,13 +1133,13 @@
             const addButtons = document.querySelectorAll('.btn-add, .card-header-bar button, .btn-edit-action');
             const deleteButtons = document.querySelectorAll('.btn-delete-action');
 
-            if (mode === 'PR') {
-                // PR: Add and Edit only, hide delete
+            if (mode === 'user1') {
+                // User 1 (Kapan Entry): Add and Edit only, hide delete
                 addButtons.forEach(btn => btn.style.display = 'inline-flex');
                 document.querySelectorAll('.card-header-bar button').forEach(btn => btn.style.display = 'flex');
                 deleteButtons.forEach(btn => btn.style.display = 'none');
             } else {
-                // SJ: Delete only, hide add and edit
+                // User 2 (Jama Delete): Delete only, hide add and edit
                 addButtons.forEach(btn => btn.style.display = 'none');
                 document.querySelectorAll('.card-header-bar button').forEach(btn => btn.style.display = 'none');
                 deleteButtons.forEach(btn => btn.style.display = 'inline-flex');
@@ -1120,7 +1149,7 @@
         document.getElementById('select-user-mode').addEventListener('change', applyUserMode);
         
         // Initial setup for User Mode
-        const savedMode = localStorage.getItem('galaxy_erp_user_mode') || 'PR';
+        const savedMode = localStorage.getItem('galaxy_erp_user_mode') || 'user1';
         document.getElementById('select-user-mode').value = savedMode;
 
         // Setup date picker value and change event listener
@@ -1181,6 +1210,44 @@
                 renderKapanMaster();
             }
         });
+
+        // Sync Custom User Names configuration from Firebase
+        db.ref('settings/user_names').on('value', (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                userNames = val;
+            }
+            updateUserModeDropdown();
+            
+            // Populate inputs in settings card
+            const input1 = document.getElementById('input-username-1');
+            const input2 = document.getElementById('input-username-2');
+            if (input1) input1.value = userNames.user1 || 'PR';
+            if (input2) input2.value = userNames.user2 || 'SJ';
+        });
+
+        function updateUserModeDropdown() {
+            const selectEl = document.getElementById('select-user-mode');
+            const currentVal = selectEl.value;
+            selectEl.innerHTML = `
+                <option value="user1">${userNames.user1 || 'PR'} (Kapan Entry)</option>
+                <option value="user2">${userNames.user2 || 'SJ'} (Jama Delete)</option>
+            `;
+            selectEl.value = currentVal;
+            applyUserMode();
+        }
+
+        function saveUserNames() {
+            const name1 = document.getElementById('input-username-1').value.trim().toUpperCase() || 'PR';
+            const name2 = document.getElementById('input-username-2').value.trim().toUpperCase() || 'SJ';
+
+            db.ref('settings/user_names').set({
+                user1: name1,
+                user2: name2
+            }).then(() => {
+                showCustomDialog('alert', 'Success', 'User Names updated successfully!');
+            });
+        }
 
         // Formatting Helpers
         function formatCarat(val) {

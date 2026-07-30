@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surat Rough Stock</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase App & Realtime Database SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #faf6f4; /* Cream background */
+            --header-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --card-hover-border: #94a3b8;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent-navy: #002d62; /* Navy blue */
+            --accent-blue: #2563eb;
+            --accent-emerald: #059669;
+            --accent-cyan: #0891b2;
+            --accent-red: #dc2626;
+            --table-row-hover: #f8fafc;
+            --subtotal-bg: #ecfdf5;
+            --subtotal-border: #a7f3d0;
+            --subtotal-text: #047857;
+            --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05);
+            --sidebar-border: #c0c0c0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: scroll;
+        }
+
+        body.modal-open {
+            overflow: hidden !important;
+        }
+
+        /* Smooth scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Top Navbar */
+        .top-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            height: 50px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--sidebar-border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 6px;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .top-tab {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #374151;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            text-transform: uppercase;
+            transition: all 0.15s;
+        }
+
+        .top-tab:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .top-tab.active {
+            background: #eff6ff;
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            transition: all 0.2s;
+            height: 30px;
+        }
+
+        /* Workspace Wrapper */
+        .workspace {
+            display: flex;
+            flex: 1;
+        }
+
+        /* Main Workspace Panel (Tightened Padding and Gaps) */
+        .main-panel {
+            flex: 1;
+            padding: 10px 16px;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .view-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+        }
+
+        /* ── Half-width layout for Surat Stock ── */
+        .excel-half-pane {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        @media (max-width: 1200px) {
+            .excel-half-pane {
+                width: 100%;
+            }
+        }
+
+        /* Controls Panel */
+        .stock-controls {
+            background: #ffffff;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+            max-width: 350px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-input {
+            width: 100%;
+            background: #f8fafc;
+            border: 1px solid var(--card-border);
+            padding: 8px 12px 8px 38px;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-navy);
+            background: #ffffff;
+        }
+
+        /* Inline controls KPIs */
+        .controls-kpi-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-left: 10px;
+            margin-right: auto;
+            flex-wrap: wrap;
+        }
+
+        .controls-kpi-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .controls-kpi-val {
+            color: #dc2626; /* Red for totals */
+            font-weight: 800;
+            font-size: 1.05rem;
+        }
+
+        .btn-add {
+            background: var(--accent-navy);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: inherit;
+            transition: opacity 0.15s;
+        }
+
+        .btn-add:hover {
+            opacity: 0.9;
+        }
+
+        /* Group Kapan Cards Grid */
+        .stock-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .stock-card {
+            background: #ffffff;
+            border: 1px solid var(--card-border);
+            box-shadow: var(--shadow-md);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+            transition: border-color 0.2s;
+        }
+
+        .stock-card:hover {
+            border-color: var(--card-hover-border);
+        }
+
+        .card-header-bar {
+            padding: 8px 12px;
+            background: var(--accent-navy);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+
+        .group-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .group-badge-summary {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .stock-table th {
+            position: sticky;
+            top: 0;
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-weight: 700;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--card-border);
+            z-index: 10;
+        }
+
+        .stock-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            color: var(--text-primary);
+        }
+
+        .stock-table tr:hover td {
+            background: var(--table-row-hover);
+        }
+
+        .stock-table tbody tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        .col-kapan {
+            font-weight: 600;
+            color: var(--accent-navy);
+        }
+
+        .col-num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .subtotal-row td {
+            background: var(--subtotal-bg) !important;
+            border-top: 1px solid var(--subtotal-border);
+            border-bottom: 2px solid var(--subtotal-border);
+            font-weight: 800;
+            color: var(--subtotal-text) !important;
+        }
+
+        .subtotal-label {
+            font-weight: 800;
+            color: var(--accent-emerald) !important;
+        }
+
+        /* Master Views Tables styling */
+        .master-grid {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .master-card-half {
+            flex: 1;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .master-table-card {
+            background: #ffffff;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        /* ==========================================
+           EXCEL SURAT STOCK SPECIFIC STYLES
+           ========================================== */
+        .excel-table-wrapper {
+            background: #ffffff;
+            border: 1.5px solid #000000;
+            overflow-x: auto;
+            margin-top: 10px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .excel-header-yellow {
+            background: #ffff00; /* Yellow */
+            color: #dc2626; /* Red bold */
+            text-align: center;
+            padding: 12px;
+            font-size: 1.6rem;
+            font-weight: 800;
+            border-bottom: 1.5px solid #000000;
+            font-family: inherit;
+        }
+
+        .excel-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+            border: 1.5px solid #000000;
+        }
+
+        .excel-grid-table th {
+            border: 1px solid #c0c0c0;
+            padding: 10px 14px;
+            font-weight: 800;
+            text-align: center;
+            color: #000000;
+            font-size: 1rem;
+        }
+
+        .excel-grid-table td {
+            border: 1px solid #c0c0c0;
+            padding: 10px 14px;
+            color: #000000;
+        }
+
+        /* Excel Colors from Screenshot */
+        .excel-hdr-rough { background: #b4c6e7; }
+        .excel-hdr-article { background: #ffffff; }
+        .excel-hdr-galaxy { background: #f8cbad; }
+
+        /* Cell Column Specific Styles */
+        .excel-cell-rough {
+            background: #d9e1f2;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        .excel-cell-article {
+            background: #ffffff;
+            font-weight: bold;
+            text-align: left;
+            font-size: 1rem;
+        }
+
+        .excel-cell-galaxy {
+            background: #fce4d6;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-size: 1rem;
+        }
+
+        .excel-totals-row {
+            font-weight: bold;
+            background: #ffffff !important;
+            border-top: 1.5px solid #000000;
+        }
+
+        .excel-totals-row td {
+            border-top: 2px double #000000;
+            border-bottom: 2px double #000000;
+            font-weight: bold;
+            font-size: 1.05rem;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            color: #0f172a;
+            padding: 24px;
+            width: 90%;
+            max-width: 480px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            border: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 8px;
+            cursor: move;
+            user-select: none;
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #475569;
+        }
+
+        .form-control {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-navy);
+        }
+
+        .btn-submit {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            margin-top: 4px;
+            background: var(--accent-navy);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+
+        .modal-error {
+            color: #dc2626;
+            font-size: 0.8rem;
+            display: none;
+            font-weight: 700;
+        }
+
+        /* Custom Dialog overlay */
+        #custom-dialog-overlay {
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(2px);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        #dialog-content {
+            background: #ffffff;
+            color: #0f172a;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            border: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .no-results-msg {
+            grid-column: 1 / -1;
+            padding: 60px;
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <div class="top-navbar">
+        <button class="top-tab active" id="tab-surat-stock" onclick="switchView('surat_stock')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+            SURAT ROUGH STOCK
+        </button>
+        <button class="top-tab" id="tab-kapan-stock" onclick="switchView('kapan_stock')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+            KAPAN STOCK
+        </button>
+        <button class="top-tab" id="tab-kapan-master" onclick="switchView('kapan_master')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+            MASTERS
+        </button>
+
+        <!-- Kapan Entry Date Picker -->
+        <div id="nav-date-wrapper" style="margin-left: 20px; display: none; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--accent-navy);"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+            Date:
+            <input type="date" id="header-date-picker" style="border: 1px solid var(--card-border); background: #ffffff; color: var(--text-primary); padding: 4px 8px; border-radius: 6px; font-family: inherit; font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer;">
+        </div>
+
+        <!-- User Role Mode Dropdown -->
+        <div id="nav-user-mode-wrapper" style="margin-left: 20px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--accent-navy);"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Mode:
+            <select id="select-user-mode" style="border: 1px solid var(--card-border); background: #ffffff; color: var(--text-primary); padding: 4px 8px; border-radius: 6px; font-family: inherit; font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer;">
+                <option value="user1">User 1 (Kapan Entry)</option>
+                <option value="user2">User 2 (Jama Delete)</option>
+            </select>
+        </div>
+        
+        <!-- Backup & Restore Buttons -->
+        <button class="top-tab" onclick="downloadBackup()" style="margin-left: auto; border-color: #059669; color: #059669;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            BACKUP
+        </button>
+        <button class="top-tab" onclick="triggerRestore()" style="border-color: #0891b2; color: #0891b2;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            RESTORE
+        </button>
+        <input type="file" id="file-restore" style="display: none;" accept=".json" onchange="restoreBackup(event)">
+
+        <!-- Dynamic Status Indicator Badge -->
+        <div id="db-status-badge" class="status-badge" style="margin-left: 10px; border-color: #cbd5e1; background: #f8fafc; color: #64748b;">
+            <span style="display:inline-block; width:8px; height:8px; background:#94a3b8; border-radius:50%; margin-right:6px;"></span>Connecting...
+        </div>
+    </div>
+
+    <!-- Workspace Panel -->
+    <div class="workspace">
+        <div class="main-panel">
+
+            <!-- VIEW 1: SURAT STOCK -->
+            <div id="view-surat-stock" class="view-pane">
+                <div class="excel-half-pane">
+                    <!-- Excel table layout -->
+                    <div class="excel-table-wrapper">
+                        <div class="excel-header-yellow">Surat Rough Stock</div>
+                        <table class="excel-grid-table">
+                            <thead>
+                                <tr>
+                                    <th class="excel-hdr-rough" style="width: 25%;">Rough No</th>
+                                    <th class="excel-hdr-article" style="width: 45%;">Article</th>
+                                    <th class="excel-hdr-galaxy" style="width: 30%;">GALAXY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-excel-stock">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: KAPAN STOCK -->
+            <div id="view-kapan-stock" class="view-pane" style="display: none;">
+                <div class="stock-controls">
+                    <div class="search-wrapper">
+                        <span class="search-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--text-secondary);"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </span>
+                        <input type="text" id="search-kapan" class="search-input" placeholder="Search Kapan No...">
+                    </div>
+                    <div class="controls-kpi-container">
+                        <div class="controls-kpi-item">
+                            <span>Total Groups:</span>
+                            <span id="ctrl-kpi-groups" class="controls-kpi-val">0</span>
+                        </div>
+                        <div class="controls-kpi-item">
+                            <span>Total Lots:</span>
+                            <span id="ctrl-kpi-kapan" class="controls-kpi-val">0</span>
+                        </div>
+                        <div class="controls-kpi-item">
+                            <span>Total Carats:</span>
+                            <span id="ctrl-kpi-carats" class="controls-kpi-val">0.00</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-add" onclick="openAddGroupModal()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                            Add Rough
+                        </button>
+                        <button class="btn-add" onclick="openAddKapanModal()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                            Add Kapan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cards grid -->
+                <div class="stock-grid" id="stock-grid">
+                    <!-- Loaded dynamically -->
+                </div>
+
+                <div id="no-results" class="no-results-msg" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; opacity:0.5;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <p>No matching Kapan number found.</p>
+                </div>
+            </div>
+
+            <!-- VIEW 3: KAPAN MASTER -->
+            <div id="view-kapan-master" class="view-pane" style="display: none;">
+                <div class="master-grid">
+                    
+                    <!-- Left: Group Master -->
+                    <div class="master-card-half">
+                        <div class="stock-controls" style="padding: 6px 12px;">
+                            <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-navy); display: flex; align-items: center; gap: 6px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                                Group Master
+                            </div>
+                            <button class="btn-add" onclick="openAddGroupModal()" style="padding:4px 8px; font-size:0.75rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                                Add Group
+                            </button>
+                        </div>
+                        <div class="master-table-card">
+                            <table class="stock-table">
+                                <thead>
+                                    <tr>
+                                        <th>Group</th>
+                                        <th style="text-align: right;">Lots</th>
+                                        <th style="text-align: right;">Carats</th>
+                                        <th style="text-align: center;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="master-group-tbody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Right: Kapan Master -->
+                    <div class="master-card-half">
+                        <div class="stock-controls" style="padding: 6px 12px;">
+                            <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-navy); display: flex; align-items: center; gap: 6px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>
+                                Kapan Master
+                            </div>
+                            <input type="text" id="kapan-master-search" class="search-input" placeholder="Search Kapan No..." style="max-width: 150px; padding: 4px 8px; font-size: 0.75rem;">
+                        </div>
+                        <div class="master-table-card" style="max-height: 480px; overflow-y: auto;">
+                            <table class="stock-table">
+                                <thead>
+                                    <tr>
+                                        <th>Group</th>
+                                        <th>Kapan</th>
+                                        <th style="text-align: right;">Carats</th>
+                                        <th style="text-align: center;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="master-kapan-tbody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODALS SECTION -->
+
+    <!-- MODAL: ADD GROUP -->
+    <div id="modal-add-group" class="modal">
+        <div id="content-modal-group" class="modal-content">
+            <div class="modal-header" id="header-modal-group">
+                <h3 style="display:flex; align-items:center; gap:6px; color:var(--accent-navy);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;display:inline-block;vertical-align:middle;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><line x1="12" x2="12" y1="10" y2="16"/><line x1="9" x2="15" y1="13" y2="13"/></svg>
+                    Add New Rough Group
+                </h3>
+                <button onclick="closeModal('add_group')" style="background:none; border:none; cursor:pointer; color:#64748b; display:flex; align-items:center; justify-content:center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            <form id="form-add-group" class="modal-form" autocomplete="off">
+                <div class="form-group">
+                    <label>Rough Article Name</label>
+                    <input type="text" id="input-group-name" class="form-control" required placeholder="e.g. 867 NURBA">
+                </div>
+                <div id="error-group" class="modal-error"></div>
+                <button type="submit" class="btn-submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Add Group
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD KAPAN -->
+    <div id="modal-add-kapan" class="modal">
+        <div id="content-modal-kapan" class="modal-content">
+            <div class="modal-header" id="header-modal-kapan">
+                <h3 style="display:flex; align-items:center; gap:6px; color:var(--accent-navy);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                    Add New Kapan Lot
+                </h3>
+                <button onclick="closeModal('add_kapan')" style="background:none; border:none; cursor:pointer; color:#64748b; display:flex; align-items:center; justify-content:center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            <form id="form-add-kapan" class="modal-form" autocomplete="off">
+                <input type="hidden" id="edit-kapan-old-no">
+                <input type="hidden" id="edit-kapan-old-group">
+                <div class="form-group">
+                    <label>Select Rough Group</label>
+                    <select id="input-kapan-group" class="form-control" required>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Kapan No</label>
+                    <input type="text" id="input-kapan-no" class="form-control" required placeholder="e.g. 867-1">
+                </div>
+                <div class="form-group">
+                    <label>Carats</label>
+                    <input type="number" step="0.01" min="0" id="input-kapan-carat" class="form-control" required placeholder="0.00">
+                </div>
+                <div id="error-kapan" class="modal-error"></div>
+                <button type="submit" class="btn-submit" id="btn-kapan-submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Save
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Dialog Modal -->
+    <div id="custom-dialog-overlay" class="modal">
+        <div id="dialog-content">
+            <div id="dialog-header" style="display:flex; align-items:center; gap:8px; font-weight:700; color:var(--accent-navy); font-size:1.1rem; border-bottom:1px solid #cbd5e1; padding-bottom:8px;">
+                <!-- Dynamically injected -->
+            </div>
+            <div id="dialog-body" style="font-size:0.95rem; color:var(--text-secondary); line-height:1.5; font-weight:500;">
+                <!-- Dynamically injected -->
+            </div>
+            <div id="dialog-footer" style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #cbd5e1; padding-top:12px;">
+                <button id="dialog-btn-cancel" style="background:#f1f5f9; border:1px solid #cbd5e1; color:var(--text-secondary); padding:8px 16px; border-radius:6px; font-family:inherit; font-weight:700; font-size:0.85rem; cursor:pointer;">Cancel</button>
+                <button id="dialog-btn-ok" style="background:var(--accent-navy); border:none; color:white; padding:8px 16px; border-radius:6px; font-family:inherit; font-weight:700; font-size:0.85rem; cursor:pointer;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- core logic -->
+    <script>
+        // Custom Dialog links
+        const dialogOverlay = document.getElementById('custom-dialog-overlay');
+        const dialogHeader = document.getElementById('dialog-header');
+        const dialogBody = document.getElementById('dialog-body');
+        const dialogBtnCancel = document.getElementById('dialog-btn-cancel');
+        const dialogBtnOk = document.getElementById('dialog-btn-ok');
+
+        let dialogResolve = null;
+
+        function showCustomDialog(type, title, message) {
+            return new Promise((resolve) => {
+                dialogResolve = resolve;
+                dialogBtnCancel.style.display = type === 'confirm' ? 'block' : 'none';
+                
+                let iconHtml = '';
+                if (type === 'alert') {
+                    iconHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:#2563eb;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+                } else if (type === 'confirm') {
+                    iconHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:#dc2626;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12" y1="17" y2="17"/></svg>';
+                }
+
+                dialogHeader.innerHTML = iconHtml + ' <span>' + title + '</span>';
+                dialogBody.innerText = message;
+                dialogOverlay.style.display = 'flex';
+            });
+        }
+
+        dialogBtnOk.addEventListener('click', () => {
+            dialogOverlay.style.display = 'none';
+            if (dialogResolve) dialogResolve(true);
+        });
+
+        dialogBtnCancel.addEventListener('click', () => {
+            dialogOverlay.style.display = 'none';
+            if (dialogResolve) dialogResolve(false);
+        });
+
+        // Firebase Configurations
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_XBf3sbphtzBB2cZrZb32r1wpaJuRjGA",
+            authDomain: "rough-stock.firebaseapp.com",
+            databaseURL: "https://rough-stock-default-rtdb.firebaseio.com",
+            projectId: "rough-stock",
+            storageBucket: "rough-stock.firebasestorage.app",
+            messagingSenderId: "644093864378",
+            appId: "1:644093864378:web:779727a7a91baf8192d583"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Listen to Firebase Connection State to update Status Badge
+        const connectedRef = firebase.database().ref(".info/connected");
+        connectedRef.on("value", (snap) => {
+            const badge = document.getElementById("db-status-badge");
+            if (!badge) return;
+            if (snap.val() === true) {
+                badge.style.borderColor = "#a7f3d0"; // light green border
+                badge.style.background = "#ecfdf5"; // light green bg
+                badge.style.color = "#047857"; // dark green text
+                badge.innerHTML = `<span style="display:inline-block; width:8px; height:8px; background:#10b981; border-radius:50%; margin-right:6px;"></span>Synced ✓`;
+            } else {
+                badge.style.borderColor = "#fecaca"; // light red border
+                badge.style.background = "#fef2f2"; // light red bg
+                badge.style.color = "#dc2626"; // dark red text
+                badge.innerHTML = `<span style="display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:50%; margin-right:6px;"></span>Offline ✖`;
+            }
+        });
+
+        // LocalStorage configurations
+        const LS_KEY = 'galaxy_merged_stock_data';
+
+        const defaultKapanState = {
+            title: "GALAXY KAPAN",
+            date: "",
+            grand_totals: { total_kapan: 0, total_carat: 0 },
+            groups: []
+        };
+
+        let mergedData = {
+            active_date: "",
+            dates: {}
+        };
+
+        // Date Picker setup
+        const datePicker = document.getElementById('header-date-picker');
+
+        function getTodayKey() {
+            const t = new Date();
+            return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+        }
+
+        function sortAllGroups(dataObj) {
+            if (!dataObj || !dataObj.dates) return;
+            Object.keys(dataObj.dates).forEach(dateKey => {
+                const dayData = dataObj.dates[dateKey];
+                if (dayData && dayData.groups) {
+                    dayData.groups.sort((a, b) => {
+                        const numA = parseInt(a.prefix) || 0;
+                        const numB = parseInt(b.prefix) || 0;
+                        if (numA !== numB) {
+                            return numA - numB;
+                        }
+                        return a.name.localeCompare(b.name);
+                    });
+                }
+            });
+        }
+
+        // Initialize state cache
+        try {
+            const cached = localStorage.getItem(LS_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed.active_date) mergedData.active_date = parsed.active_date;
+                if (parsed.dates) mergedData.dates = parsed.dates;
+            }
+            
+            const todayKey = getTodayKey();
+            if (!mergedData.active_date) {
+                mergedData.active_date = todayKey;
+            }
+            if (!mergedData.dates[todayKey]) {
+                mergedData.dates[todayKey] = JSON.parse(JSON.stringify(defaultKapanState));
+            }
+            sortAllGroups(mergedData);
+        } catch (e) {
+            const tKey = getTodayKey();
+            mergedData.active_date = tKey;
+            mergedData.dates[tKey] = JSON.parse(JSON.stringify(defaultKapanState));
+        }
+
+        // Setup user role mode selection
+        function applyUserMode() {
+            const mode = document.getElementById('select-user-mode').value;
+            localStorage.setItem('galaxy_erp_user_mode', mode);
+
+            const addButtons = document.querySelectorAll('.btn-add, .card-header-bar button');
+            const deleteButtons = document.querySelectorAll('.stock-table button, #master-group-tbody button, #master-kapan-tbody button');
+
+            if (mode === 'user1') {
+                // User 1: Add only, hide delete
+                addButtons.forEach(btn => btn.style.display = 'flex');
+                deleteButtons.forEach(btn => btn.style.display = 'none');
+            } else {
+                // User 2: Delete only, hide add
+                addButtons.forEach(btn => btn.style.display = 'none');
+                deleteButtons.forEach(btn => btn.style.display = 'inline-block');
+            }
+        }
+
+        document.getElementById('select-user-mode').addEventListener('change', applyUserMode);
+        
+        // Initial setup for User Mode
+        const savedMode = localStorage.getItem('galaxy_erp_user_mode') || 'user1';
+        document.getElementById('select-user-mode').value = savedMode;
+
+        // Setup date picker value and change event listener
+        datePicker.value = mergedData.active_date;
+        datePicker.addEventListener('change', (e) => {
+            const newDate = e.target.value;
+            if (!newDate) return;
+            
+            if (!mergedData.dates[newDate]) {
+                // Clone from currently active date to carry forward stock on Firebase
+                const currentData = mergedData.dates[mergedData.active_date] || defaultKapanState;
+                const cloned = JSON.parse(JSON.stringify(currentData));
+                db.ref('dates/' + newDate).set(cloned);
+            }
+            
+            mergedData.active_date = newDate;
+            saveData();
+            renderSuratStock();
+            renderKapanStock();
+        });
+
+        function saveData() {
+            try {
+                localStorage.setItem(LS_KEY, JSON.stringify(mergedData));
+            } catch(e) {
+                console.error("Storage error", e);
+            }
+        }
+
+        // Connect Firebase Realtime Database Listener
+        db.ref('dates').on('value', (snapshot) => {
+            const fbDates = snapshot.val() || {};
+            mergedData.dates = fbDates;
+
+            // Enforce sequence sorting
+            sortAllGroups(mergedData);
+
+            const todayKey = getTodayKey();
+            // If today key does not exist on Firebase, initialize it
+            if (!mergedData.dates[todayKey]) {
+                const sortedKeys = Object.keys(mergedData.dates).sort();
+                const last = sortedKeys[sortedKeys.length - 1];
+                if (last) {
+                    const cloned = JSON.parse(JSON.stringify(mergedData.dates[last]));
+                    db.ref('dates/' + todayKey).set(cloned);
+                } else {
+                    db.ref('dates/' + todayKey).set(JSON.parse(JSON.stringify(defaultKapanState)));
+                }
+            }
+
+            saveData();
+
+            // Refresh UI Views dynamically
+            renderSuratStock();
+            if (document.getElementById('tab-kapan-stock').classList.contains('active')) {
+                renderKapanStock();
+            } else if (document.getElementById('tab-kapan-master').classList.contains('active')) {
+                renderKapanMaster();
+            }
+        });
+
+        // Formatting Helpers
+        function formatCarat(val) {
+            const num = parseFloat(val);
+            if (isNaN(num)) return "0.00";
+            return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Tab views switcher
+        function switchView(viewName) {
+            // Remove active classes
+            document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-pane').forEach(p => p.style.display = 'none');
+
+            const dateWrapper = document.getElementById('nav-date-wrapper');
+
+            if (viewName === 'surat_stock') {
+                document.getElementById('tab-surat-stock').classList.add('active');
+                document.getElementById('view-surat-stock').style.display = 'flex';
+                dateWrapper.style.display = 'none'; // Hide date picker for Surat Stock
+                renderSuratStock();
+            } else if (viewName === 'kapan_stock') {
+                document.getElementById('tab-kapan-stock').classList.add('active');
+                document.getElementById('view-kapan-stock').style.display = 'flex';
+                dateWrapper.style.display = 'flex'; // Show date picker for Kapan
+                renderKapanStock();
+            } else if (viewName === 'kapan_master') {
+                document.getElementById('tab-kapan-master').classList.add('active');
+                document.getElementById('view-kapan-master').style.display = 'flex';
+                dateWrapper.style.display = 'flex'; // Show date picker for Masters
+                renderKapanMaster();
+            }
+        }
+
+        // ==========================================
+        // 1. KAPAN ENTRY VIEW RENDER & LOGIC
+        // ==========================================
+        function renderKapanStock() {
+            const grid = document.getElementById('stock-grid');
+            const searchVal = document.getElementById('search-kapan').value.toLowerCase().trim();
+            grid.innerHTML = '';
+
+            const dayData = mergedData.dates[mergedData.active_date] || { groups: [] };
+            let totalGroups = 0;
+            let totalLots = 0;
+            let totalCaratsSum = 0.0;
+
+            dayData.groups.forEach((group) => {
+                // Filter items inside group
+                const matchedItems = (group.items || []).filter(item => {
+                    if (!searchVal) return true;
+                    return item.kapan && item.kapan.toLowerCase().includes(searchVal);
+                });
+
+                if (searchVal && matchedItems.length === 0) return;
+
+                totalGroups++;
+
+                // Compute card totals
+                let groupCarat = 0.0;
+                matchedItems.forEach(item => {
+                    groupCarat += (parseFloat(item.carat) || 0);
+                    totalLots++;
+                });
+                totalCaratsSum += groupCarat;
+
+                // Build Table Rows
+                let tableRows = '';
+                matchedItems.forEach((item, index) => {
+                    tableRows += `
+                        <tr>
+                            <td class="col-sno" style="text-align:center;">${index + 1}</td>
+                            <td class="col-kapan">${item.kapan}</td>
+                            <td class="col-num">${formatCarat(item.carat)}</td>
+                            <td style="text-align: center; width: 30px;">
+                                <button onclick="deleteKapan('${group.name.replace(/'/g, "\'")}', '${item.kapan.replace(/'/g, "\'")}')" style="background:none; border:none; color:#ef4444; cursor:pointer; opacity:0.6; display:flex; align-items:center; justify-content:center; margin:0 auto;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                // Subtotal Row
+                tableRows += `
+                    <tr class="subtotal-row">
+                        <td></td>
+                        <td class="subtotal-label">Subtotal</td>
+                        <td class="col-num">${formatCarat(groupCarat)}</td>
+                        <td></td>
+                    </tr>
+                `;
+
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                card.innerHTML = `
+                    <div class="card-header-bar">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span class="group-title">${group.name}</span>
+                            <button onclick="openAddKapanForGroup('${group.name.replace(/'/g, "\'")}')" style="background:none; border:none; color:white; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                            </button>
+                        </div>
+                        <span class="group-badge-summary">${matchedItems.length} Lots</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="stock-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px; text-align:center;">S.No</th>
+                                    <th>Kapan</th>
+                                    <th style="text-align:right;">Carat</th>
+                                    <th style="width:30px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            // Update Inline KPIs
+            document.getElementById('ctrl-kpi-groups').innerText = totalGroups;
+            document.getElementById('ctrl-kpi-kapan').innerText = totalLots;
+            document.getElementById('ctrl-kpi-carats').innerText = formatCarat(totalCaratsSum);
+
+            document.getElementById('no-results').style.display = (totalGroups === 0) ? 'flex' : 'none';
+            applyUserMode(); // Apply visibility rules
+        }
+
+        document.getElementById('search-kapan').addEventListener('input', renderKapanStock);
+
+        // ==========================================
+        // 2. KAPAN MASTER VIEW RENDER
+        // ==========================================
+        function renderKapanMaster() {
+            const groupTbody = document.getElementById('master-group-tbody');
+            const kapanTbody = document.getElementById('master-kapan-tbody');
+            const searchVal = document.getElementById('kapan-master-search').value.toLowerCase().trim();
+
+            groupTbody.innerHTML = '';
+            kapanTbody.innerHTML = '';
+
+            const dayData = mergedData.dates[mergedData.active_date] || { groups: [] };
+
+            // Render Groups Master
+            dayData.groups.forEach((group) => {
+                let groupCarats = 0.0;
+                group.items.forEach(item => {
+                    groupCarats += (parseFloat(item.carat) || 0);
+                });
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="col-kapan" style="font-weight:700;">${group.name}</td>
+                    <td class="col-num">${group.items.length}</td>
+                    <td class="col-num">${formatCarat(groupCarats)}</td>
+                    <td style="text-align: center;">
+                        <button onclick="deleteGroup('${group.name.replace(/'/g, "\'")}')" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:4px; padding:2px 6px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:2px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;display:inline-block;vertical-align:middle;"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                            Delete Group
+                        </button>
+                    </td>
+                `;
+                groupTbody.appendChild(tr);
+            });
+
+            // Render Kapans Master
+            let counter = 0;
+            dayData.groups.forEach((group) => {
+                group.items.forEach((item) => {
+                    if (searchVal && !item.kapan.toLowerCase().includes(searchVal)) return;
+                    counter++;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="color:var(--text-secondary); font-weight:600;">${group.name}</td>
+                        <td class="col-kapan">${item.kapan}</td>
+                        <td class="col-num">${formatCarat(item.carat)}</td>
+                        <td style="text-align: center;">
+                            <button onclick="deleteKapan('${group.name.replace(/'/g, "\'")}', '${item.kapan.replace(/'/g, "\'")}')" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:4px; padding:2px 6px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:2px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;display:inline-block;vertical-align:middle;"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                Delete
+                            </button>
+                        </td>
+                    `;
+                    kapanTbody.appendChild(tr);
+                });
+            });
+
+            applyUserMode(); // Apply visibility rules
+        }
+
+        document.getElementById('kapan-master-search').addEventListener('input', renderKapanMaster);
+
+        // ==========================================
+        // 3. EXCEL SURAT STOCK VIEW RENDER
+        // ==========================================
+        function renderSuratStock() {
+            const tbody = document.getElementById('tbody-excel-stock');
+            tbody.innerHTML = '';
+
+            let galTotal = 0;
+            const dayData = mergedData.dates[mergedData.active_date] || { groups: [] };
+
+            dayData.groups.forEach((group) => {
+                // Calculate GALAXY carat sum dynamically
+                let groupGalaxySum = 0.0;
+                (group.items || []).forEach(item => {
+                    groupGalaxySum += (parseFloat(item.carat) || 0.0);
+                });
+
+                galTotal += groupGalaxySum;
+
+                // Check formatting: articles default blue, Nurba 6-7 bold red
+                let articleColor = "#1d4ed8"; // bold blue
+                if (String(group.name).trim().toLowerCase().includes('nurba 6-7')) {
+                    articleColor = "#dc2626"; // bold red
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="excel-cell-rough">${group.prefix || ""}</td>
+                    <td class="excel-cell-article" style="color:${articleColor};">${group.name || ""}</td>
+                    <td class="excel-cell-galaxy">${groupGalaxySum > 0 ? formatCarat(groupGalaxySum) : ""}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Render Excel Totals Rows
+            // 1. Column Totals Row
+            const r22 = document.createElement('tr');
+            r22.className = 'excel-totals-row';
+            r22.innerHTML = `
+                <td colspan="2" style="border-right: none;"></td>
+                <td class="excel-cell-galaxy" style="font-weight:bold; border-left:none;">${galTotal > 0 ? formatCarat(galTotal) : ""}</td>
+            `;
+            tbody.appendChild(r22);
+
+            // 2. Grand Total Row
+            const r23 = document.createElement('tr');
+            r23.style.fontWeight = 'bold';
+            r23.innerHTML = `
+                <td colspan="2" style="border:none; background:transparent;"></td>
+                <td class="excel-cell-galaxy" style="border:1px solid #c0c0c0; border-top:2px double #000000; border-bottom:2px double #000000; font-weight:bold; font-size:1.05rem;">${formatCarat(galTotal)}</td>
+            `;
+            tbody.appendChild(r23);
+
+            // 3. Formula Labels Row
+            const r24 = document.createElement('tr');
+            r24.style.fontWeight = 'bold';
+            r24.style.textAlign = 'center';
+            r24.innerHTML = `
+                <td colspan="2" style="border:none; background:transparent;"></td>
+                <td style="border:1px solid #c0c0c0; background:#ffffff; text-align:center;">Total Stk</td>
+            `;
+            tbody.appendChild(r24);
+        }
+
+        // ==========================================
+        // KAPAN ENTRY DB MUTATORS
+        // ==========================================
+        function addKapanEntry(groupName, kapanNo, carat) {
+            const dayData = mergedData.dates[mergedData.active_date];
+            if (!dayData) return;
+
+            const group = dayData.groups.find(g => g.name === groupName);
+            if (!group) return;
+
+            // Check duplicate
+            const duplicate = group.items.find(i => i.kapan === kapanNo);
+            if (duplicate) {
+                return "duplicate";
+            }
+
+            group.items.push({ kapan: kapanNo, carat: parseFloat(carat) });
+            
+            // Push changes directly to Firebase database
+            db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+            return "success";
+        }
+
+        function deleteKapan(groupName, kapanNo) {
+            showCustomDialog('confirm', 'Confirm', `Are you sure you want to delete Kapan "${kapanNo}"?`).then(confirmed => {
+                if (!confirmed) return;
+                
+                const dayData = mergedData.dates[mergedData.active_date];
+                if (!dayData) return;
+
+                const group = dayData.groups.find(g => g.name === groupName);
+                if (group) {
+                    group.items = group.items.filter(item => item.kapan !== kapanNo);
+                    db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+                }
+            });
+        }
+
+        function deleteGroup(groupName) {
+            showCustomDialog('confirm', 'Confirm', `Are you sure you want to delete Group "${groupName}" and all its Kapan lots?`).then(confirmed => {
+                if (!confirmed) return;
+                
+                const dayData = mergedData.dates[mergedData.active_date];
+                if (!dayData) return;
+
+                dayData.groups = dayData.groups.filter(g => g.name !== groupName);
+                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+            });
+        }
+
+        // ==========================================
+        // MODALS CONTROL LOGIC
+        // ==========================================
+        function makeElementDraggable(dragHeaderId, dragContentId) {
+            const dragHeader = document.getElementById(dragHeaderId);
+            const dragContent = document.getElementById(dragContentId);
+            if (!dragHeader || !dragContent) return;
+
+            let startX = 0, startY = 0;
+            let translateX = 0, translateY = 0;
+
+            dragHeader.addEventListener('mousedown', dragStart);
+
+            function dragStart(e) {
+                if (e.button !== 0) return;
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+                
+                e.preventDefault();
+                startX = e.clientX;
+                startY = e.clientY;
+                translateX = parseFloat(dragContent.dataset.translateX) || 0;
+                translateY = parseFloat(dragContent.dataset.translateY) || 0;
+                
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', dragEnd);
+            }
+
+            function drag(e) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const newX = translateX + dx;
+                const newY = translateY + dy;
+
+                dragContent.style.transform = `translate(${newX}px, ${newY}px)`;
+                dragContent.dataset.translateX = newX;
+                dragContent.dataset.translateY = newY;
+            }
+
+            function dragEnd() {
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('mouseup', dragEnd);
+            }
+        }
+
+        function resetModalPosition(dragContentId) {
+            const dragContent = document.getElementById(dragContentId);
+            if (dragContent) {
+                dragContent.style.transform = "translate(0px, 0px)";
+                dragContent.dataset.translateX = "0";
+                dragContent.dataset.translateY = "0";
+            }
+        }
+
+        // Bind draggables
+        makeElementDraggable('header-modal-group', 'content-modal-group');
+        makeElementDraggable('header-modal-kapan', 'content-modal-kapan');
+
+        function openAddGroupModal() {
+            resetModalPosition('content-modal-group');
+            document.getElementById('form-add-group').reset();
+            document.getElementById('error-group').style.display = 'none';
+            document.getElementById('modal-add-group').style.display = 'flex';
+            setTimeout(() => document.getElementById('input-group-name').focus(), 50);
+        }
+
+        function openAddKapanModal() {
+            resetModalPosition('content-modal-kapan');
+            document.getElementById('form-add-kapan').reset();
+            document.getElementById('error-kapan').style.display = 'none';
+            document.getElementById('edit-kapan-old-no').value = '';
+            document.getElementById('edit-kapan-old-group').value = '';
+            
+            // Populate select group dropdown
+            const selectDropdown = document.getElementById('input-kapan-group');
+            selectDropdown.innerHTML = '<option value="">-- Select --</option>';
+            const dayData = mergedData.dates[mergedData.active_date] || { groups: [] };
+            
+            dayData.groups.forEach(g => {
+                selectDropdown.innerHTML += `<option value="${g.name}">${g.name}</option>`;
+            });
+
+            document.getElementById('modal-add-kapan').style.display = 'flex';
+        }
+
+        function openAddKapanForGroup(groupName) {
+            openAddKapanModal();
+            document.getElementById('input-kapan-group').value = groupName;
+            
+            // Auto fill Kapan No prefix based on group prefix
+            const dayData = mergedData.dates[mergedData.active_date];
+            const groupObj = dayData.groups.find(g => g.name === groupName);
+            if (groupObj && groupObj.prefix) {
+                document.getElementById('input-kapan-no').value = groupObj.prefix + '-';
+            }
+            setTimeout(() => document.getElementById('input-kapan-no').focus(), 50);
+        }
+
+        function closeModal(type) {
+            if (type === 'add_group') {
+                document.getElementById('modal-add-group').style.display = 'none';
+            } else if (type === 'add_kapan') {
+                document.getElementById('modal-add-kapan').style.display = 'none';
+            }
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+
+        // ==========================================
+        // SUBMISSIONS HANDLERS
+        // ==========================================
+
+        // 1. Group Submit
+        document.getElementById('form-add-group').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const errDiv = document.getElementById('error-group');
+            errDiv.style.display = 'none';
+
+            const groupName = document.getElementById('input-group-name').value.trim();
+            if (!groupName) {
+                errDiv.innerText = "Please enter an Article Name!";
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            const match = groupName.match(/^\d+/);
+            const prefix = match ? match[0] : groupName;
+
+            const dayData = mergedData.dates[mergedData.active_date];
+            const duplicate = dayData.groups.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+            if (duplicate) {
+                errDiv.innerText = "This group already exists!";
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            dayData.groups.push({
+                name: groupName,
+                prefix: prefix,
+                items: []
+            });
+
+            // Enforce numerical sorting of groups
+            dayData.groups.sort((a, b) => {
+                const numA = parseInt(a.prefix) || 0;
+                const numB = parseInt(b.prefix) || 0;
+                if (numA !== numB) {
+                    return numA - numB;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            // Set state directly in Firebase, trigger list listeners automatically
+            db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+                closeModal('add_group');
+            });
+        });
+
+        // 2. Kapan Submit
+        document.getElementById('form-add-kapan').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const errDiv = document.getElementById('error-kapan');
+            errDiv.style.display = 'none';
+
+            const groupName = document.getElementById('input-kapan-group').value;
+            const kapanNo = document.getElementById('input-kapan-no').value.trim();
+            const carat = parseFloat(document.getElementById('input-kapan-carat').value) || 0;
+
+            if (!groupName || !kapanNo || carat <= 0) {
+                errDiv.innerText = "Please enter valid details!";
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            // Prefix validation
+            const dayData = mergedData.dates[mergedData.active_date];
+            const groupObj = dayData.groups.find(g => g.name === groupName);
+            if (groupObj && groupObj.prefix) {
+                if (!kapanNo.toLowerCase().startsWith(groupObj.prefix.toLowerCase())) {
+                    errDiv.innerText = `This Kapan number must start with group prefix "${groupObj.prefix}"!`;
+                    errDiv.style.display = 'block';
+                    return;
+                }
+            }
+
+            const result = addKapanEntry(groupName, kapanNo, carat);
+            if (result === "duplicate") {
+                errDiv.innerText = "This Kapan number already exists in this group!";
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            closeModal('add_kapan');
+        });
+
+        // ==========================================
+        // BACKUP & RESTORE ACTIONS
+        // ==========================================
+        function downloadBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mergedData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `Galaxy_MergedERP_Backup_${dateStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function triggerRestore() {
+            document.getElementById('file-restore').click();
+        }
+
+        function restoreBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    if (parsedData && parsedData.dates) {
+                        // Push entire restored dates back to Firebase
+                        db.ref('dates').set(parsedData.dates).then(async () => {
+                            await showCustomDialog('alert', 'Success', 'Data backup loaded successfully!');
+                            window.location.reload();
+                        });
+                    } else {
+                        await showCustomDialog('alert', 'Error', 'Invalid backup file! Please upload a valid JSON file.');
+                    }
+                } catch(err) {
+                    await showCustomDialog('alert', 'Error', 'Error reading the backup file!');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Initial Load
+        renderSuratStock();
+    </script>
+</body>
+</html>

@@ -1254,7 +1254,6 @@
                 matchedItems.forEach((item, index) => {
                     tableRows += `
                         <tr>
-                            <td class="col-sno" style="text-align:center;">${index + 1}</td>
                             <td class="col-kapan">${item.kapan}</td>
                             <td class="col-num">${formatCarat(item.carat)}</td>
                             <td style="text-align: center; width: 50px; white-space: nowrap;">
@@ -1274,7 +1273,6 @@
                 // Subtotal Row
                 tableRows += `
                     <tr class="subtotal-row">
-                        <td></td>
                         <td class="subtotal-label">Subtotal</td>
                         <td class="col-num">${formatCarat(groupCarat)}</td>
                         <td></td>
@@ -1297,7 +1295,6 @@
                         <table class="stock-table">
                             <thead>
                                 <tr>
-                                    <th style="width:40px; text-align:center;">S.No</th>
                                     <th>Kapan</th>
                                     <th style="text-align:right;">Carat</th>
                                     <th style="width:50px;"></th>
@@ -1473,96 +1470,6 @@
             return "success";
         }
 
-        function deleteKapan(groupName, kapanNo) {
-            showCustomDialog('confirm', 'Confirm', `Are you sure you want to delete Kapan "${kapanNo.toUpperCase()}"?`).then(confirmed => {
-                if (!confirmed) return;
-                
-                const dayData = mergedData.dates[mergedData.active_date];
-                if (!dayData) return;
-                if (!dayData.groups) dayData.groups = [];
-
-                const group = dayData.groups.find(g => g.name === groupName);
-                if (group) {
-                    if (!group.items) group.items = [];
-                    group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
-                    db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
-                }
-            });
-        }
-
-        function deleteGroup(groupName) {
-            showCustomDialog('confirm', 'Confirm', `Are you sure you want to delete Group "${groupName.toUpperCase()}" and all its Kapan lots?`).then(confirmed => {
-                if (!confirmed) return;
-                
-                const dayData = mergedData.dates[mergedData.active_date];
-                if (!dayData) return;
-                if (!dayData.groups) dayData.groups = [];
-
-                dayData.groups = dayData.groups.filter(g => g.name !== groupName);
-                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
-            });
-        }
-
-        // ==========================================
-        // MODALS CONTROL LOGIC
-        // ==========================================
-        function makeElementDraggable(dragHeaderId, dragContentId) {
-            const dragHeader = document.getElementById(dragHeaderId);
-            const dragContent = document.getElementById(dragContentId);
-            if (!dragHeader || !dragContent) return;
-
-            let startX = 0, startY = 0;
-            let translateX = 0, translateY = 0;
-
-            dragHeader.addEventListener('mousedown', dragStart);
-
-            function dragStart(e) {
-                if (e.button !== 0) return;
-                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
-                
-                e.preventDefault();
-                startX = e.clientX;
-                startY = e.clientY;
-                translateX = parseFloat(dragContent.dataset.translateX) || 0;
-                translateY = parseFloat(dragContent.dataset.translateY) || 0;
-                
-                document.addEventListener('mousemove', drag);
-                document.addEventListener('mouseup', dragEnd);
-            }
-
-            function drag(e) {
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                const newX = translateX + dx;
-                const newY = translateY + dy;
-
-                dragContent.style.transform = `translate(${newX}px, ${newY}px)`;
-                dragContent.dataset.translateX = newX;
-                dragContent.dataset.translateY = newY;
-            }
-
-            function dragEnd() {
-                document.removeEventListener('mousemove', drag);
-                document.removeEventListener('mouseup', dragEnd);
-            }
-        }
-
-        // Auto uppercase text inputs and textareas in real-time
-        // Enforced natural capitalization listener
-        function setupAutoUppercase() {
-            document.querySelectorAll('input[type="text"], textarea').forEach(el => {
-                el.removeEventListener('input', uppercaseListener);
-                el.addEventListener('input', uppercaseListener);
-            });
-        }
-
-        function uppercaseListener(e) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
-        }
-
         // Keyboard navigation and Enter key listeners for inputs
         document.getElementById('input-group-name').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -1585,10 +1492,7 @@
             }
         });
 
-        // ==========================================
-        // SUBMISSIONS HANDLERS
-        // ==========================================
-
+        // Submissions handlers and other logic...
         // 1. Group Submit (Supports Add & Edit)
         document.getElementById('form-add-group').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1814,51 +1718,6 @@
                 await showCustomDialog('alert', 'Bulk Add Summary', summaryMsg);
             }
         });
-
-        // ==========================================
-        // BACKUP & RESTORE ACTIONS
-        // ==========================================
-        function downloadBackup() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mergedData, null, 2));
-            const downloadAnchor = document.createElement('a');
-            const dateStr = new Date().toISOString().slice(0, 10);
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `Galaxy_MergedERP_Backup_${dateStr}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
-
-        function triggerRestore() {
-            document.getElementById('file-restore').click();
-        }
-
-        function restoreBackup(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const parsedData = JSON.parse(e.target.result);
-                    if (parsedData && parsedData.dates) {
-                        // Push entire restored dates back to Firebase
-                        db.ref('dates').set(parsedData.dates).then(async () => {
-                            await showCustomDialog('alert', 'Success', 'Data backup loaded successfully!');
-                            window.location.reload();
-                        });
-                    } else {
-                        await showCustomDialog('alert', 'Error', 'Invalid backup file! Please upload a valid JSON file.');
-                    }
-                } catch(err) {
-                    await showCustomDialog('alert', 'Error', 'Error reading the backup file!');
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // Initial Load
-        renderSuratStock();
     </script>
 </body>
 </html>

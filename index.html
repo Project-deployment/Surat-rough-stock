@@ -84,7 +84,7 @@
             position: sticky;
             top: 0;
             z-index: 1000;
-            height: 50px;
+            height: 40px;
             background: var(--header-bg);
             border-bottom: 1px solid var(--sidebar-border);
             display: flex;
@@ -99,7 +99,7 @@
             background: #ffffff;
             border: 1px solid #d1d5db;
             border-radius: 4px;
-            padding: 6px 14px;
+            padding: 3px 10px;
             font-size: 0.8rem;
             font-weight: 700;
             color: #374151;
@@ -135,7 +135,7 @@
             align-items: center;
             white-space: nowrap;
             transition: all 0.2s;
-            height: 30px;
+            height: 24px;
         }
 
         /* Workspace Wrapper */
@@ -180,7 +180,7 @@
             background: #ffffff;
             border: 1px solid var(--card-border);
             border-radius: 12px;
-            padding: 10px 16px;
+            padding: 6px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -210,7 +210,7 @@
             width: 100%;
             background: #f8fafc;
             border: 1px solid var(--card-border);
-            padding: 8px 12px 8px 38px;
+            padding: 5px 12px 5px 38px;
             border-radius: 8px;
             color: var(--text-primary);
             font-size: 0.9rem;
@@ -258,7 +258,7 @@
             color: white;
             border: none;
             border-radius: 8px;
-            padding: 8px 16px;
+            padding: 5px 12px;
             font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
@@ -270,6 +270,26 @@
         }
 
         .btn-add:hover {
+            opacity: 0.9;
+        }
+
+        .btn-delete {
+            background: var(--accent-red);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: inherit;
+            transition: opacity 0.15s;
+        }
+
+        .btn-delete:hover {
             opacity: 0.9;
         }
 
@@ -831,6 +851,18 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
+                        <button class="btn-delete btn-delete-action" onclick="deleteSelectedKapans()" style="display: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round" style="width:16px;height:16px;">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                <line x1="10" x2="10" y1="11" y2="17"/>
+                                <line x1="14" x2="14" y1="11" y2="17"/>
+                            </svg>
+                            Delete Selected
+                        </button>
                         <button class="btn-add" onclick="openAddGroupModal()">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                 fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
@@ -952,6 +984,19 @@
                                 </svg>
                                 Kapan Master
                             </div>
+                            <button class="btn-delete btn-delete-action" onclick="deleteSelectedMasterKapans()"
+                                style="padding:4px 8px; font-size:0.75rem; display:none; margin-left: auto; margin-right: 10px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                    stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;">
+                                    <path d="M3 6h18"/>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                    <line x1="10" x2="10" y1="11" y2="17"/>
+                                    <line x1="14" x2="14" y1="11" y2="17"/>
+                                </svg>
+                                Delete Selected
+                            </button>
                             <input type="text" id="kapan-master-search" class="search-input"
                                 placeholder="Search Kapan No..."
                                 style="max-width: 150px; padding: 4px 8px; font-size: 0.75rem;">
@@ -960,6 +1005,9 @@
                             <table class="stock-table">
                                 <thead>
                                     <tr>
+                                        <th class="col-select" style="width: 30px; text-align: center;">
+                                            <input type="checkbox" class="bulk-delete-master-header-checkbox" onclick="toggleMasterSelectAll(this)">
+                                        </th>
                                         <th>Group</th>
                                         <th>Kapan</th>
                                         <th>Carats</th>
@@ -1315,17 +1363,20 @@
 
             const addButtons = document.querySelectorAll('.btn-add, .card-header-bar button, .btn-edit-action');
             const deleteButtons = document.querySelectorAll('.btn-delete-action');
+            const selectCols = document.querySelectorAll('.col-select');
 
             if (mode === 'user1') {
                 // User 1: Add and Edit only, hide delete
                 addButtons.forEach(btn => btn.style.display = 'inline-flex');
                 document.querySelectorAll('.card-header-bar button').forEach(btn => btn.style.display = 'flex');
                 deleteButtons.forEach(btn => btn.style.display = 'none');
+                selectCols.forEach(col => col.style.display = 'none');
             } else {
                 // User 2: Delete only, hide add and edit
                 addButtons.forEach(btn => btn.style.display = 'none');
                 document.querySelectorAll('.card-header-bar button').forEach(btn => btn.style.display = 'none');
                 deleteButtons.forEach(btn => btn.style.display = 'inline-flex');
+                selectCols.forEach(col => col.style.display = '');
             }
         }
 
@@ -1470,6 +1521,9 @@
                 matchedItems.forEach((item) => {
                     tableRows += `
                         <tr>
+                            <td class="col-select" style="width: 30px; text-align: center;">
+                                <input type="checkbox" class="bulk-delete-checkbox" data-group="${group.name.replace(/'/g, "\\'")}" data-kapan="${item.kapan.replace(/'/g, "\\'")}">
+                            </td>
                             <td class="col-kapan">${item.kapan}</td>
                             <td class="col-num">${formatCarat(item.carat)}</td>
                             <td style="text-align: center; width: 50px; white-space: nowrap;">
@@ -1489,6 +1543,7 @@
                 // Subtotal Row
                 tableRows += `
                     <tr class="subtotal-row">
+                        <td class="col-select"></td>
                         <td class="subtotal-label">${matchedItems.length}</td>
                         <td class="col-num">${formatCarat(groupCarat)}</td>
                         <td></td>
@@ -1511,6 +1566,9 @@
                         <table class="stock-table">
                             <thead>
                                 <tr>
+                                    <th class="col-select" style="width: 30px; text-align: center;">
+                                        <input type="checkbox" class="bulk-delete-header-checkbox" onclick="toggleSelectAll(this, '${group.name.replace(/'/g, "\\'")}')">
+                                    </th>
                                     <th>Kapan</th>
                                     <th>Carat</th>
                                     <th style="width:50px;"></th>
@@ -1585,6 +1643,9 @@
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
+                        <td class="col-select" style="width: 30px; text-align: center;">
+                            <input type="checkbox" class="bulk-delete-master-checkbox" data-group="${group.name.replace(/'/g, "\\'")}" data-kapan="${item.kapan.replace(/'/g, "\\'")}">
+                        </td>
                         <td style="color:var(--text-secondary); font-weight:600;">${group.name}</td>
                         <td class="col-kapan">${item.kapan}</td>
                         <td class="col-num">${formatCarat(item.carat)}</td>
@@ -1699,6 +1760,81 @@
 
                 dayData.groups = dayData.groups.filter(g => g.name !== groupName);
                 db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+            });
+        }
+
+        function toggleSelectAll(headerCheckbox, groupName) {
+            const checkboxes = document.querySelectorAll('.bulk-delete-checkbox');
+            checkboxes.forEach(cb => {
+                if (cb.dataset.group === groupName) {
+                    cb.checked = headerCheckbox.checked;
+                }
+            });
+        }
+
+        function toggleMasterSelectAll(headerCheckbox) {
+            const checkboxes = document.querySelectorAll('.bulk-delete-master-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = headerCheckbox.checked;
+            });
+        }
+
+        function deleteSelectedKapans() {
+            const checked = document.querySelectorAll('.bulk-delete-checkbox:checked');
+            if (checked.length === 0) {
+                showCustomDialog('alert', 'Error', 'No items selected for deletion.');
+                return;
+            }
+
+            showCustomDialog('confirm', 'Confirm Bulk Delete', `Are you sure you want to delete ${checked.length} selected Kapan lot(s)?`).then(confirmed => {
+                if (!confirmed) return;
+
+                const dayData = mergedData.dates[mergedData.active_date];
+                if (!dayData || !dayData.groups) return;
+
+                checked.forEach(cb => {
+                    const groupName = cb.dataset.group;
+                    const kapanNo = cb.dataset.kapan;
+                    const group = dayData.groups.find(g => g.name === groupName);
+                    if (group && group.items) {
+                        group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
+                    }
+                });
+
+                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+                    showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
+                });
+            });
+        }
+
+        function deleteSelectedMasterKapans() {
+            const checked = document.querySelectorAll('.bulk-delete-master-checkbox:checked');
+            if (checked.length === 0) {
+                showCustomDialog('alert', 'Error', 'No items selected for deletion.');
+                return;
+            }
+
+            showCustomDialog('confirm', 'Confirm Bulk Delete', `Are you sure you want to delete ${checked.length} selected Kapan lot(s)?`).then(confirmed => {
+                if (!confirmed) return;
+
+                const dayData = mergedData.dates[mergedData.active_date];
+                if (!dayData || !dayData.groups) return;
+
+                checked.forEach(cb => {
+                    const groupName = cb.dataset.group;
+                    const kapanNo = cb.dataset.kapan;
+                    const group = dayData.groups.find(g => g.name === groupName);
+                    if (group && group.items) {
+                        group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
+                    }
+                });
+
+                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+                    showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
+                    // Reset header checkbox
+                    const masterHeader = document.querySelector('.bulk-delete-master-header-checkbox');
+                    if (masterHeader) masterHeader.checked = false;
+                });
             });
         }
 

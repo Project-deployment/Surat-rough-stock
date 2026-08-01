@@ -1326,18 +1326,25 @@
             Object.keys(dataObj.dates).forEach(dateKey => {
                 const dayData = dataObj.dates[dateKey];
                 if (dayData && dayData.groups) {
+                    dayData.groups = ensureArray(dayData.groups);
                     dayData.groups.sort((a, b) => {
-                        const numA = parseInt(a.prefix) || 0;
-                        const numB = parseInt(b.prefix) || 0;
+                        if (!a || !b) return 0;
+                        const prefixA = a.prefix || "";
+                        const prefixB = b.prefix || "";
+                        const numA = parseInt(prefixA) || 0;
+                        const numB = parseInt(prefixB) || 0;
                         if (numA !== numB) {
                             return numA - numB;
                         }
-                        return a.name.localeCompare(b.name);
+                        const nameA = a.name || "";
+                        const nameB = b.name || "";
+                        return nameA.localeCompare(nameB);
                     });
 
                     // Sort items inside each group
                     dayData.groups.forEach(group => {
-                        if (group.items) {
+                        if (group) {
+                            group.items = ensureArray(group.items);
                             group.items.sort(compareKapan);
                         }
                     });
@@ -1425,6 +1432,8 @@
             }
         }
 
+        let isInitialLoad = true;
+
         // Connect Firebase Realtime Database Listener
         db.ref('dates').on('value', (snapshot) => {
             const fbDates = snapshot.val() || {};
@@ -1447,16 +1456,19 @@
             // Enforce sequence sorting
             sortAllGroups(mergedData);
 
-            const todayKey = getTodayKey();
-            // If today key does not exist on Firebase, initialize it
-            if (!mergedData.dates[todayKey]) {
-                const sortedKeys = Object.keys(mergedData.dates).sort();
-                const last = sortedKeys[sortedKeys.length - 1];
-                if (last) {
-                    const cloned = JSON.parse(JSON.stringify(mergedData.dates[last]));
-                    db.ref('dates/' + todayKey).set(cloned);
-                } else {
-                    db.ref('dates/' + todayKey).set(JSON.parse(JSON.stringify(defaultKapanState)));
+            if (isInitialLoad) {
+                isInitialLoad = false;
+                const todayKey = getTodayKey();
+                // If today key does not exist on Firebase, initialize it once
+                if (!fbDates[todayKey]) {
+                    const sortedKeys = Object.keys(fbDates).sort();
+                    const last = sortedKeys[sortedKeys.length - 1];
+                    if (last) {
+                        const cloned = JSON.parse(JSON.stringify(fbDates[last]));
+                        db.ref('dates/' + todayKey).set(cloned);
+                    } else {
+                        db.ref('dates/' + todayKey).set(JSON.parse(JSON.stringify(defaultKapanState)));
+                    }
                 }
             }
 

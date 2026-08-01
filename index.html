@@ -1275,6 +1275,18 @@
             return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
         }
 
+        function ensureArray(val) {
+            if (!val) return [];
+            if (Array.isArray(val)) return val.filter(Boolean);
+            if (typeof val === 'object') {
+                return Object.keys(val)
+                    .sort((a, b) => parseInt(a) - parseInt(b))
+                    .map(k => val[k])
+                    .filter(Boolean);
+            }
+            return [];
+        }
+
         // Natural sort comparator for Kapan No (Alphabets first, then Numbers)
         function compareKapan(itemA, itemB) {
             const a = (itemA.kapan || "").toUpperCase();
@@ -1416,6 +1428,20 @@
         // Connect Firebase Realtime Database Listener
         db.ref('dates').on('value', (snapshot) => {
             const fbDates = snapshot.val() || {};
+            
+            // Sanitize fbDates to ensure groups and items are always clean arrays
+            Object.keys(fbDates).forEach(dateKey => {
+                const dayData = fbDates[dateKey];
+                if (dayData) {
+                    dayData.groups = ensureArray(dayData.groups);
+                    dayData.groups.forEach(group => {
+                        if (group) {
+                            group.items = ensureArray(group.items);
+                        }
+                    });
+                }
+            });
+
             mergedData.dates = fbDates;
 
             // Enforce sequence sorting

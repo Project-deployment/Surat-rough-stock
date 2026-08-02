@@ -20,7 +20,6 @@
             --bg-color: #faf6f4;
             /* Cream background */
             --header-bg: #ffffff;
-            --card-bg: #ffffff;
             --card-border: #cbd5e1;
             --card-hover-border: #94a3b8;
             --text-primary: #0f172a;
@@ -29,7 +28,6 @@
             /* Navy blue */
             --accent-blue: #2563eb;
             --accent-emerald: #059669;
-            --accent-cyan: #0891b2;
             --accent-red: #dc2626;
             --table-row-hover: #f8fafc;
             --subtotal-bg: #ecfdf5;
@@ -54,10 +52,6 @@
             display: flex;
             flex-direction: column;
             overflow-y: scroll;
-        }
-
-        body.modal-open {
-            overflow: hidden !important;
         }
 
         /* Smooth scrollbar */
@@ -1271,9 +1265,6 @@
         const LS_KEY = 'galaxy_merged_stock_data';
 
         const defaultKapanState = {
-            title: "GALAXY KAPAN",
-            date: "",
-            grand_totals: { total_kapan: 0, total_carat: 0 },
             groups: []
         };
 

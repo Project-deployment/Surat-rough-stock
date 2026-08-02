@@ -1421,22 +1421,74 @@
         document.getElementById('select-user-mode').value = savedMode;
 
         // Setup date picker value and change event listener
-        datePicker.value = mergedData.active_date;
+        let activeDateRef = null;
+
+        function handleActiveDateUpdate(snapshot) {
+            const dayData = snapshot.val() || JSON.parse(JSON.stringify(defaultKapanState));
+            
+            // Sanitize dayData to ensure groups and items are always clean arrays
+            dayData.groups = ensureArray(dayData.groups);
+            dayData.groups.forEach(group => {
+                if (group) {
+                    group.items = ensureArray(group.items);
+                }
+            });
+
+            // Update mergedData
+            mergedData.dates[mergedData.active_date] = dayData;
+
+            // Enforce sequence sorting
+            sortAllGroups(mergedData);
+            saveData();
+
+            // Refresh UI Views dynamically
+            renderSuratStock();
+            if (document.getElementById('tab-kapan-stock').classList.contains('active')) {
+                renderKapanStock();
+            } else if (document.getElementById('tab-kapan-master').classList.contains('active')) {
+                renderKapanMaster();
+            }
+        }
+
+        function listenToActiveDate(newDate) {
+            const oldDate = mergedData.active_date;
+
+            // Unsubscribe from previous listener if exists
+            if (activeDateRef) {
+                activeDateRef.off('value');
+            }
+
+            // Update active date
+            mergedData.active_date = newDate;
+            datePicker.value = newDate;
+            saveData();
+
+            // Reference for the new date
+            activeDateRef = db.ref('dates/' + newDate);
+
+            // Check if the new date exists on Firebase
+            activeDateRef.once('value').then((snap) => {
+                if (!snap.exists()) {
+                    // Carry forward stock from old active date's data
+                    const currentData = mergedData.dates[oldDate] || defaultKapanState;
+                    const cloned = JSON.parse(JSON.stringify(currentData));
+
+                    // Write to Firebase
+                    activeDateRef.set(cloned).then(() => {
+                        // Subscribe to listener
+                        activeDateRef.on('value', handleActiveDateUpdate);
+                    });
+                } else {
+                    // Subscribe to listener directly
+                    activeDateRef.on('value', handleActiveDateUpdate);
+                }
+            });
+        }
+
         datePicker.addEventListener('change', (e) => {
             const newDate = e.target.value;
             if (!newDate) return;
-
-            if (!mergedData.dates[newDate]) {
-                // Clone from currently active date to carry forward stock on Firebase
-                const currentData = mergedData.dates[mergedData.active_date] || defaultKapanState;
-                const cloned = JSON.parse(JSON.stringify(currentData));
-                db.ref('dates/' + newDate).set(cloned);
-            }
-
-            mergedData.active_date = newDate;
-            saveData();
-            renderSuratStock();
-            renderKapanStock();
+            listenToActiveDate(newDate);
         });
 
         function saveData() {
@@ -1447,54 +1499,37 @@
             }
         }
 
-        let isInitialLoad = true;
+        // Initialize active date listener
+        const todayKey = getTodayKey();
+        let initialActiveDate = mergedData.active_date || todayKey;
+        mergedData.active_date = initialActiveDate;
+        datePicker.value = initialActiveDate;
 
-        // Connect Firebase Realtime Database Listener
-        db.ref('dates').on('value', (snapshot) => {
-            const fbDates = snapshot.val() || {};
-            
-            // Sanitize fbDates to ensure groups and items are always clean arrays
-            Object.keys(fbDates).forEach(dateKey => {
-                const dayData = fbDates[dateKey];
-                if (dayData) {
-                    dayData.groups = ensureArray(dayData.groups);
-                    dayData.groups.forEach(group => {
-                        if (group) {
-                            group.items = ensureArray(group.items);
-                        }
-                    });
-                }
-            });
+        activeDateRef = db.ref('dates/' + initialActiveDate);
 
-            mergedData.dates = fbDates;
+        // Fetch once to check existence and handle initial carry forward
+        activeDateRef.once('value').then((snapshot) => {
+            if (!snapshot.exists()) {
+                // If it doesn't exist, find the last date on Firebase to carry forward
+                db.ref('dates').orderByKey().limitToLast(1).once('value').then((lastSnap) => {
+                    const lastVal = lastSnap.val();
+                    if (lastVal) {
+                        const lastKey = Object.keys(lastVal)[0];
+                        const cloned = JSON.parse(JSON.stringify(lastVal[lastKey]));
 
-            // Enforce sequence sorting
-            sortAllGroups(mergedData);
-
-            if (isInitialLoad) {
-                isInitialLoad = false;
-                const todayKey = getTodayKey();
-                // If today key does not exist on Firebase, initialize it once
-                if (!fbDates[todayKey]) {
-                    const sortedKeys = Object.keys(fbDates).sort();
-                    const last = sortedKeys[sortedKeys.length - 1];
-                    if (last) {
-                        const cloned = JSON.parse(JSON.stringify(fbDates[last]));
-                        db.ref('dates/' + todayKey).set(cloned);
+                        activeDateRef.set(cloned).then(() => {
+                            activeDateRef.on('value', handleActiveDateUpdate);
+                        });
                     } else {
-                        db.ref('dates/' + todayKey).set(JSON.parse(JSON.stringify(defaultKapanState)));
+                        // DB is completely empty, initialize with default
+                        activeDateRef.set(JSON.parse(JSON.stringify(defaultKapanState))).then(() => {
+                            activeDateRef.on('value', handleActiveDateUpdate);
+                        });
                     }
-                }
-            }
-
-            saveData();
-
-            // Refresh UI Views dynamically
-            renderSuratStock();
-            if (document.getElementById('tab-kapan-stock').classList.contains('active')) {
-                renderKapanStock();
-            } else if (document.getElementById('tab-kapan-master').classList.contains('active')) {
-                renderKapanMaster();
+                });
+            } else {
+                // Subscribe to listener directly
+                activeDateRef.on('value', handleActiveDateUpdate);
             }
         });
 
@@ -1769,11 +1804,13 @@
             if (!dayData) return;
             if (!dayData.groups) dayData.groups = [];
 
-            const group = dayData.groups.find(g => g.name === groupName);
+            // Clone groups to avoid local-only in-place mutation
+            const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
+            const group = groupsClone.find(g => g.name === groupName);
             if (!group) return;
             if (!group.items) group.items = [];
 
-            // Check duplicate
+            // Check duplicate in cloned data
             const duplicate = group.items.find(i => i.kapan.toUpperCase() === kapanNo.toUpperCase());
             if (duplicate) {
                 return "duplicate";
@@ -1782,7 +1819,7 @@
             group.items.push({ kapan: kapanNo.toUpperCase(), carat: parseFloat(carat) });
 
             // Push changes directly to Firebase database
-            db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+            db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
             return "success";
         }
 
@@ -1791,14 +1828,15 @@
                 if (!confirmed) return;
 
                 const dayData = mergedData.dates[mergedData.active_date];
-                if (!dayData) return;
-                if (!dayData.groups) dayData.groups = [];
+                if (!dayData || !dayData.groups) return;
 
-                const group = dayData.groups.find(g => g.name === groupName);
+                // Clone groups to avoid local-only in-place mutation
+                const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
+                const group = groupsClone.find(g => g.name === groupName);
                 if (group) {
                     if (!group.items) group.items = [];
                     group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
-                    db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+                    db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
                 }
             });
         }
@@ -1808,11 +1846,12 @@
                 if (!confirmed) return;
 
                 const dayData = mergedData.dates[mergedData.active_date];
-                if (!dayData) return;
-                if (!dayData.groups) dayData.groups = [];
+                if (!dayData || !dayData.groups) return;
 
-                dayData.groups = dayData.groups.filter(g => g.name !== groupName);
-                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+                // Clone groups and filter
+                const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
+                const updatedGroups = groupsClone.filter(g => g.name !== groupName);
+                db.ref('dates/' + mergedData.active_date + '/groups').set(updatedGroups);
             });
         }
 
@@ -1845,21 +1884,24 @@
                 const dayData = mergedData.dates[mergedData.active_date];
                 if (!dayData || !dayData.groups) return;
 
+                // Clone groups
+                const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
                 checked.forEach(cb => {
                     const groupName = cb.dataset.group;
                     const kapanNo = cb.dataset.kapan;
-                    const group = dayData.groups.find(g => g.name === groupName);
+                    const group = groupsClone.find(g => g.name === groupName);
                     if (group && group.items) {
                         group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
                     }
                 });
 
-                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+                db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
                     showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
                 });
             });
         }
 
+        // Deleting selected master Kapans
         function deleteSelectedMasterKapans() {
             const checked = document.querySelectorAll('.bulk-delete-master-checkbox:checked');
             if (checked.length === 0) {
@@ -1873,16 +1915,18 @@
                 const dayData = mergedData.dates[mergedData.active_date];
                 if (!dayData || !dayData.groups) return;
 
+                // Clone groups
+                const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
                 checked.forEach(cb => {
                     const groupName = cb.dataset.group;
                     const kapanNo = cb.dataset.kapan;
-                    const group = dayData.groups.find(g => g.name === groupName);
+                    const group = groupsClone.find(g => g.name === groupName);
                     if (group && group.items) {
                         group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
                     }
                 });
 
-                db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+                db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
                     showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
                     // Reset header checkbox
                     const masterHeader = document.querySelector('.bulk-delete-master-header-checkbox');
@@ -2190,32 +2234,34 @@
 
             const dayData = mergedData.dates[mergedData.active_date];
             if (!dayData) return;
-            if (!dayData.groups) dayData.groups = [];
+
+            // Clone groups to avoid local-only in-place mutation
+            const groupsClone = JSON.parse(JSON.stringify(dayData.groups || []));
 
             if (oldGroupName) {
                 // EDIT MODE
-                const duplicate = dayData.groups.find(g => g.name.toUpperCase() === groupName.toUpperCase() && g.name !== oldGroupName);
+                const duplicate = groupsClone.find(g => g.name.toUpperCase() === groupName.toUpperCase() && g.name !== oldGroupName);
                 if (duplicate) {
                     errDiv.innerText = "This group name already exists!";
                     errDiv.style.display = 'block';
                     return;
                 }
 
-                const group = dayData.groups.find(g => g.name === oldGroupName);
+                const group = groupsClone.find(g => g.name === oldGroupName);
                 if (group) {
                     group.name = groupName;
                     group.prefix = prefix.toUpperCase();
                 }
             } else {
                 // ADD MODE
-                const duplicate = dayData.groups.find(g => g.name.toUpperCase() === groupName.toUpperCase());
+                const duplicate = groupsClone.find(g => g.name.toUpperCase() === groupName.toUpperCase());
                 if (duplicate) {
                     errDiv.innerText = "This group already exists!";
                     errDiv.style.display = 'block';
                     return;
                 }
 
-                dayData.groups.push({
+                groupsClone.push({
                     name: groupName,
                     prefix: prefix.toUpperCase(),
                     items: []
@@ -2223,7 +2269,7 @@
             }
 
             // Enforce numerical sorting of groups
-            dayData.groups.sort((a, b) => {
+            groupsClone.sort((a, b) => {
                 const numA = parseInt(a.prefix) || 0;
                 const numB = parseInt(b.prefix) || 0;
                 if (numA !== numB) {
@@ -2233,7 +2279,7 @@
             });
 
             // Set state directly in Firebase, trigger list listeners automatically
-            db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups).then(() => {
+            db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
                 closeModal('add_group');
             });
         });
@@ -2253,9 +2299,10 @@
 
             const dayData = mergedData.dates[mergedData.active_date];
             if (!dayData) return;
-            if (!dayData.groups) dayData.groups = [];
 
-            const groupObj = dayData.groups.find(g => g.name === groupName);
+            // Clone groups to avoid local-only in-place mutation
+            const groupsClone = JSON.parse(JSON.stringify(dayData.groups || []));
+            const groupObj = groupsClone.find(g => g.name === groupName);
             if (!groupObj) return;
             if (!groupObj.items) groupObj.items = [];
 
@@ -2286,7 +2333,7 @@
 
                 if (oldKapanNo) {
                     // EDIT MODE
-                    const oldGroupObj = dayData.groups.find(g => g.name === oldGroupName);
+                    const oldGroupObj = groupsClone.find(g => g.name === oldGroupName);
                     if (oldGroupObj) {
                         // Remove from old group list temporarily to avoid duplicate self-check
                         oldGroupObj.items = (oldGroupObj.items || []).filter(item => item.kapan.toUpperCase() !== oldKapanNo.toUpperCase());
@@ -2295,7 +2342,7 @@
                     // Check duplicate in target group
                     const duplicate = groupObj.items.find(i => i.kapan.toUpperCase() === KapanNo.toUpperCase());
                     if (duplicate) {
-                        // Re-add to old group to restore state
+                        // Re-add to old group to restore state in clone
                         if (oldGroupObj) {
                             oldGroupObj.items.push({ kapan: oldKapanNo, carat: carat });
                         }
@@ -2306,7 +2353,7 @@
 
                     // Insert updated item
                     groupObj.items.push({ kapan: KapanNo, carat: carat });
-                    await db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+                    await db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
                 } else {
                     // ADD MODE
                     const result = addKapanEntry(groupName, KapanNo, carat);
@@ -2379,13 +2426,13 @@
                     return;
                 }
 
-                // Add all valid parsed entries
+                // Add all valid parsed entries to clone
                 entriesToAdd.forEach(entry => {
                     groupObj.items.push(entry);
                 });
 
                 // Save list to Firebase
-                await db.ref('dates/' + mergedData.active_date + '/groups').set(dayData.groups);
+                await db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
                 closeModal('add_kapan');
 
                 // Show response message summary
@@ -2401,14 +2448,25 @@
         // BACKUP & RESTORE ACTIONS
         // ==========================================
         function downloadBackup() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mergedData, null, 2));
-            const downloadAnchor = document.createElement('a');
-            const dateStr = new Date().toISOString().slice(0, 10);
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `Galaxy_MergedERP_Backup_${dateStr}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
+            // Show a visual alert of background download if it takes time
+            db.ref('dates').once('value').then((snapshot) => {
+                const allDates = snapshot.val() || {};
+                const backupPayload = {
+                    active_date: mergedData.active_date,
+                    dates: allDates
+                };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
+                const downloadAnchor = document.createElement('a');
+                const dateStr = new Date().toISOString().slice(0, 10);
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `Galaxy_MergedERP_Backup_${dateStr}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            }).catch(err => {
+                console.error("Backup download failed", err);
+                showCustomDialog('alert', 'Backup Error', 'Failed to generate backup: ' + err.message);
+            });
         }
 
         function triggerRestore() {

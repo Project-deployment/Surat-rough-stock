@@ -1228,20 +1228,14 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Wrap db.ref to catch and display any database write/permission errors
-        const originalRef = db.ref;
-        db.ref = function(path) {
-            const refInstance = originalRef.call(db, path);
-            const originalSet = refInstance.set;
-            refInstance.set = function(val) {
-                return originalSet.call(refInstance, val).catch(err => {
-                    console.error("Firebase database write error at path:", path, err);
-                    showCustomDialog('alert', 'Database Error', 'Failed to save changes: ' + err.message + '\n\nPlease check your internet connection or database permissions.');
-                    throw err;
-                });
-            };
-            return refInstance;
-        };
+        // Helper to safely write to Firebase Database with built-in error handling
+        function safeDbSet(path, value) {
+            return db.ref(path).set(value).catch(err => {
+                console.error("Firebase database write error at path:", path, err);
+                showCustomDialog('alert', 'Database Error', 'Failed to save changes: ' + err.message + '\n\nPlease check your internet connection or database permissions.');
+                throw err;
+            });
+        }
 
         // Listen to Firebase Connection State to update Status Badge
         const connectedRef = firebase.database().ref(".info/connected");
@@ -1410,11 +1404,13 @@
         // Initial setup for User Mode
         const savedMode = localStorage.getItem('galaxy_erp_user_mode') || 'user1';
         document.getElementById('select-user-mode').value = savedMode;
+        applyUserMode();
 
         // Setup date picker value and change event listener
         let activeDateRef = null;
 
         function handleActiveDateUpdate(snapshot) {
+            const dateKey = snapshot.key;
             const dayData = snapshot.val() || JSON.parse(JSON.stringify(defaultKapanState));
             
             // Sanitize dayData to ensure groups and items are always clean arrays
@@ -1426,18 +1422,20 @@
             });
 
             // Update mergedData
-            mergedData.dates[mergedData.active_date] = dayData;
+            mergedData.dates[dateKey] = dayData;
 
             // Enforce sequence sorting
             sortAllGroups(mergedData);
             saveData();
 
-            // Refresh UI Views dynamically
-            renderSuratStock();
-            if (document.getElementById('tab-kapan-stock').classList.contains('active')) {
-                renderKapanStock();
-            } else if (document.getElementById('tab-kapan-master').classList.contains('active')) {
-                renderKapanMaster();
+            // Refresh UI Views dynamically if the updated date is the active date
+            if (dateKey === mergedData.active_date) {
+                renderSuratStock();
+                if (document.getElementById('tab-kapan-stock').classList.contains('active')) {
+                    renderKapanStock();
+                } else if (document.getElementById('tab-kapan-master').classList.contains('active')) {
+                    renderKapanMaster();
+                }
             }
         }
 
@@ -1465,7 +1463,7 @@
                     const cloned = JSON.parse(JSON.stringify(currentData));
 
                     // Write to Firebase
-                    activeDateRef.set(cloned).then(() => {
+                    safeDbSet('dates/' + newDate, cloned).then(() => {
                         // Subscribe to listener
                         activeDateRef.on('value', handleActiveDateUpdate);
                     });
@@ -1508,12 +1506,12 @@
                         const lastKey = Object.keys(lastVal)[0];
                         const cloned = JSON.parse(JSON.stringify(lastVal[lastKey]));
 
-                        activeDateRef.set(cloned).then(() => {
+                        safeDbSet('dates/' + initialActiveDate, cloned).then(() => {
                             activeDateRef.on('value', handleActiveDateUpdate);
                         });
                     } else {
                         // DB is completely empty, initialize with default
-                        activeDateRef.set(JSON.parse(JSON.stringify(defaultKapanState))).then(() => {
+                        safeDbSet('dates/' + initialActiveDate, JSON.parse(JSON.stringify(defaultKapanState))).then(() => {
                             activeDateRef.on('value', handleActiveDateUpdate);
                         });
                     }
@@ -1810,7 +1808,7 @@
             group.items.push({ kapan: kapanNo.toUpperCase(), carat: parseFloat(carat) });
 
             // Push changes directly to Firebase database
-            db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
+            safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone);
             return "success";
         }
 
@@ -1827,7 +1825,7 @@
                 if (group) {
                     if (!group.items) group.items = [];
                     group.items = group.items.filter(item => item.kapan.toUpperCase() !== kapanNo.toUpperCase());
-                    db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
+                    safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone);
                 }
             });
         }
@@ -1842,7 +1840,7 @@
                 // Clone groups and filter
                 const groupsClone = JSON.parse(JSON.stringify(dayData.groups));
                 const updatedGroups = groupsClone.filter(g => g.name !== groupName);
-                db.ref('dates/' + mergedData.active_date + '/groups').set(updatedGroups);
+                safeDbSet('dates/' + mergedData.active_date + '/groups', updatedGroups);
             });
         }
 
@@ -1886,7 +1884,7 @@
                     }
                 });
 
-                db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
+                safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone).then(() => {
                     showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
                 });
             });
@@ -1917,7 +1915,7 @@
                     }
                 });
 
-                db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
+                safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone).then(() => {
                     showCustomDialog('alert', 'Success', `Successfully deleted ${checked.length} Kapan lot(s).`);
                     // Reset header checkbox
                     const masterHeader = document.querySelector('.bulk-delete-master-header-checkbox');
@@ -2270,7 +2268,7 @@
             });
 
             // Set state directly in Firebase, trigger list listeners automatically
-            db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone).then(() => {
+            safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone).then(() => {
                 closeModal('add_group');
             });
         });
@@ -2344,7 +2342,7 @@
 
                     // Insert updated item
                     groupObj.items.push({ kapan: KapanNo, carat: carat });
-                    await db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
+                    await safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone);
                 } else {
                     // ADD MODE
                     const result = addKapanEntry(groupName, KapanNo, carat);
@@ -2423,7 +2421,7 @@
                 });
 
                 // Save list to Firebase
-                await db.ref('dates/' + mergedData.active_date + '/groups').set(groupsClone);
+                await safeDbSet('dates/' + mergedData.active_date + '/groups', groupsClone);
                 closeModal('add_kapan');
 
                 // Show response message summary
@@ -2474,7 +2472,7 @@
                     const parsedData = JSON.parse(e.target.result);
                     if (parsedData && parsedData.dates) {
                         // Push entire restored dates back to Firebase
-                        db.ref('dates').set(parsedData.dates).then(async () => {
+                        safeDbSet('dates', parsedData.dates).then(async () => {
                             await showCustomDialog('alert', 'Success', 'Data backup loaded successfully!');
                             window.location.reload();
                         });
@@ -2531,7 +2529,7 @@
         function saveUserNames() {
             const u1 = document.getElementById('input-username-1').value.trim().toUpperCase() || "User 1";
             const u2 = document.getElementById('input-username-2').value.trim().toUpperCase() || "User 2";
-            db.ref('user_names').set({ user1: u1, user2: u2 });
+            safeDbSet('user_names', { user1: u1, user2: u2 });
         }
 
         // Initial Load

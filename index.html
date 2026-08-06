@@ -1228,13 +1228,24 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Helper to safely write to Firebase Database with built-in error handling
-        function safeDbSet(path, value) {
-            return db.ref(path).set(value).catch(err => {
-                console.error("Firebase database write error at path:", path, err);
-                showCustomDialog('alert', 'Database Error', 'Failed to save changes: ' + err.message + '\n\nPlease check your internet connection or database permissions.');
-                throw err;
-            });
+        // Wrap db.ref to catch and display any database write/permission errors
+        const originalRef = db.ref;
+        db.ref = function(path) {
+            const refInstance = originalRef.call(db, path);
+            const originalSet = refInstance.set;
+            refInstance.set = function(val) {
+                return originalSet.call(refInstance, val).catch(err => {
+                    console.error("Firebase database write error at path:", path, err);
+                    showCustomDialog('alert', 'Database Error', 'Failed to save changes: ' + err.message + '\n\nPlease check your internet connection or database permissions.');
+                    throw err;
+                });
+            };
+            return refInstance;
+        };
+
+        // Helper function to safely set firebase database values
+        function safeDbSet(path, val) {
+            return db.ref(path).set(val);
         }
 
         // Listen to Firebase Connection State to update Status Badge
